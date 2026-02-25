@@ -9,6 +9,33 @@ description = "Add your description here"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Sergei Konovalov", email = "l0kifs91@gmail.com" }
+]
+maintainers = [
+    { name = "l0kifs", email = "l0kifs91@gmail.com" }
+]
+keywords = [
+    "developer-tools",
+    "pytest-plugin",
+    "testing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Environment :: Plugins",
+    "Natural Language :: English",
+]
 dependencies = [
     # Configuration and logging
     "pydantic-settings>=2.0.0",
@@ -16,16 +43,28 @@ dependencies = [
 
     # Data validation
     "pydantic>=2.0.0",
+
+    # Testing
+    "pytest>=9.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.0",
     "pytest-xdist>=3.0.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.5",
     "ty>=0.0.11",
 ]
 
+[project.entry-points.pytest11]
+pytest-paraflow = "pytest_paraflow.entry_points.plugin"
+
 [tool.uv]
 package = true
+
+[project.urls]
+Homepage = "https://github.com/l0kifs/pytest-paraflow"
+Documentation = "https://github.com/l0kifs/pytest-paraflow/blob/main/README.md"
+Repository = "https://github.com/l0kifs/pytest-paraflow.git"
+Issues = "https://github.com/l0kifs/pytest-paraflow/issues"
+Changelog = "https://github.com/l0kifs/pytest-paraflow/blob/main/CHANGELOG.md"

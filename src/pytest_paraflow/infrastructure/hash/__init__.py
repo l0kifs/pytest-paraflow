@@ -1,0 +1,1 @@
+"""Hash infrastructure adapters."""
