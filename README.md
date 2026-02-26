@@ -81,6 +81,17 @@ You can configure them via environment variables:
 
 CLI values always override environment defaults.
 
+## GitHub Actions (matrix sharding)
+
+Example workflow template: `examples/paraflow-matrix-example.yml`.
+Copy it into `.github/workflows/` in your repository to enable CI.
+
+It runs pytest in 4 shards via matrix (`shard_id: [0, 1, 2, 3]`) and limits concurrent shard jobs with:
+
+- `strategy.max-parallel: 2`
+- `--paraflow-shard-id=${{ matrix.shard_id }}`
+- `--paraflow-num-shards=4`
+
 ## Validation rules
 
 - `--paraflow-shard-id` is required whenever sharding is enabled.

@@ -1,0 +1,48 @@
+---
+name: Paraflow Matrix Example
+
+'on':
+  # Manual run for experimentation.
+  workflow_dispatch:
+  # Validate behavior on incoming changes.
+  pull_request:
+  # Keep main branch health visible with sharded CI.
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Shard ${{ matrix.shard_id }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Let all shards complete to surface full failure set.
+      fail-fast: false
+      # Cap concurrent runners even when matrix has more shards.
+      max-parallel: 2
+      matrix:
+        # One job per shard id.
+        shard_id: [0, 1, 2, 3]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run sharded tests
+        run: |
+          # matrix.shard_id selects current shard, num_shards must match matrix size.
+          # Keep related tests together when they use @pytest.mark.paraflow_group(...).
+          uv run pytest -vv \
+            --paraflow-shard-id=${{ matrix.shard_id }} \
+            --paraflow-num-shards=4 \
+            --paraflow-group-marker=paraflow_group

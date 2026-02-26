@@ -1,0 +1,56 @@
+---
+name: Paraflow Matrix + Allure TestOps Example
+
+'on':
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  # Directory where pytest writes Allure results.
+  ALLURE_RESULTS: "allure-results"
+
+jobs:
+  tests:
+    name: Shard ${{ matrix.shard_id }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Run at most 2 shard jobs simultaneously.
+      max-parallel: 2
+      matrix:
+        shard_id: [0, 1, 2, 3]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      # Official action: installs allurectl and configures CI context.
+      - name: Install and configure allurectl
+        uses: allure-framework/setup-allurectl@v1
+        with:
+          allure-endpoint: ${{ secrets.ALLURE_ENDPOINT }}
+          allure-project-id: ${{ secrets.ALLURE_PROJECT_ID }}
+          allure-token: ${{ secrets.ALLURE_TOKEN }}
+
+      - name: Run sharded tests and upload to Allure TestOps
+        run: |
+          mkdir -p "${ALLURE_RESULTS}"
+          # In one workflow run, matrix shards are aggregated into the same launch.
+          allurectl watch -- uv run pytest -vv \
+            --paraflow-shard-id=${{ matrix.shard_id }} \
+            --paraflow-num-shards=4 \
+            --paraflow-group-marker=paraflow_group \
+            --alluredir="${ALLURE_RESULTS}"
