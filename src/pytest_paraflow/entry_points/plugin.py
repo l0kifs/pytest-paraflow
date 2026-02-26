@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from _pytest.nodes import Item
 
+from pytest_paraflow.config.settings import get_settings
 from pytest_paraflow.domains.distribution.services import (
     GroupingService,
     ShardAssignmentService,
@@ -23,13 +24,14 @@ from pytest_paraflow.infrastructure.pytest.item_mapper import PytestItemMapper
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Register paraflow plugin command-line options."""
+    settings = get_settings()
     group = parser.getgroup("paraflow")
     group.addoption(
         "--paraflow-shard-id",
         action="store",
         type=int,
         dest="paraflow_shard_id",
-        default=None,
+        default=settings.shard_id,
         help="Shard index to execute (zero-based)",
     )
     group.addoption(
@@ -37,7 +39,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store",
         type=int,
         dest="paraflow_num_shards",
-        default=None,
+        default=settings.num_shards,
         help="Total number of shards",
     )
     group.addoption(
@@ -45,7 +47,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store",
         type=int,
         dest="paraflow_target_shard_size",
-        default=None,
+        default=settings.target_shard_size,
         help=(
             "Desired tests per shard when total shard count is calculated dynamically"
         ),
@@ -54,7 +56,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--paraflow-group-marker",
         action="append",
         dest="paraflow_group_marker",
-        default=[],
+        default=list(settings.group_marker),
         metavar="MARKER",
         help=(
             "Marker name used for grouping. Repeat option to support multiple markers. "
@@ -105,12 +107,16 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[Item]) -> N
         config.hook.pytest_deselected(items=deselected_items)
 
     items[:] = selected_items
-    config._paraflow_state = _ParaflowRuntimeState(
-        shard_id=options.shard_id,
-        total_shards=total_shards,
-        selected=len(selected_items),
-        deselected=len(deselected_items),
-        options=options,
+    setattr(
+        config,
+        "_paraflow_state",
+        _ParaflowRuntimeState(
+            shard_id=options.shard_id,
+            total_shards=total_shards,
+            selected=len(selected_items),
+            deselected=len(deselected_items),
+            options=options,
+        ),
     )
 
 

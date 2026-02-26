@@ -69,6 +69,18 @@ Marker behavior:
 - `--paraflow-target-shard-size`: desired tests per shard for dynamic sizing.
 - `--paraflow-group-marker`: marker name used for grouping (repeatable).
 
+## Configuration defaults
+
+CLI option defaults are loaded from `Settings` (`src/pytest_paraflow/config/settings.py`).
+You can configure them via environment variables:
+
+- `PYTEST_PARAFLOW__SHARD_ID`
+- `PYTEST_PARAFLOW__NUM_SHARDS`
+- `PYTEST_PARAFLOW__TARGET_SHARD_SIZE`
+- `PYTEST_PARAFLOW__GROUP_MARKER` (JSON array, for example `["paraflow_group", "smoke"]`)
+
+CLI values always override environment defaults.
+
 ## Validation rules
 
 - `--paraflow-shard-id` is required whenever sharding is enabled.

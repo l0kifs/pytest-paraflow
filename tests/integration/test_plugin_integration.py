@@ -215,6 +215,195 @@ def test_e():
     assert "--paraflow-shard-id must be in range [0, 2]" in output
 
 
+def test_environment_defaults_enable_static_sharding(
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Environment defaults should enable static sharding without CLI options."""
+    _configure_test_environment(pytester)
+    pytester.makepyfile(
+        test_env_static="""
+def test_a():
+    assert True
+
+def test_b():
+    assert True
+
+def test_c():
+    assert True
+
+def test_d():
+    assert True
+"""
+    )
+
+    all_nodeids = {
+        "test_env_static.py::test_a",
+        "test_env_static.py::test_b",
+        "test_env_static.py::test_c",
+        "test_env_static.py::test_d",
+    }
+    monkeypatch.setenv("PYTEST_PARAFLOW__NUM_SHARDS", "2")
+
+    selected_by_shard: dict[int, set[str]] = {}
+    for shard_id in (0, 1):
+        monkeypatch.setenv("PYTEST_PARAFLOW__SHARD_ID", str(shard_id))
+        result = pytester.runpytest_subprocess("-vv", "--color=no")
+        assert result.ret in {pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED}
+        selected_by_shard[shard_id] = _executed_nodeids(result)
+
+    assert selected_by_shard[0].isdisjoint(selected_by_shard[1])
+    assert selected_by_shard[0] | selected_by_shard[1] == all_nodeids
+
+
+def test_cli_options_override_environment_defaults(
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit CLI options should override environment-based defaults."""
+    _configure_test_environment(pytester)
+    pytester.makepyfile(
+        test_env_precedence="""
+def test_a():
+    assert True
+
+def test_b():
+    assert True
+
+def test_c():
+    assert True
+
+def test_d():
+    assert True
+"""
+    )
+
+    all_nodeids = {
+        "test_env_precedence.py::test_a",
+        "test_env_precedence.py::test_b",
+        "test_env_precedence.py::test_c",
+        "test_env_precedence.py::test_d",
+    }
+    monkeypatch.setenv("PYTEST_PARAFLOW__SHARD_ID", "0")
+    monkeypatch.setenv("PYTEST_PARAFLOW__NUM_SHARDS", "2")
+
+    shard_0_default = pytester.runpytest_subprocess("-vv", "--color=no")
+    shard_1_cli = pytester.runpytest_subprocess(
+        "-vv",
+        "--color=no",
+        "--paraflow-shard-id=1",
+    )
+
+    assert shard_0_default.ret in {pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED}
+    assert shard_1_cli.ret in {pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED}
+
+    shard_0_nodeids = _executed_nodeids(shard_0_default)
+    shard_1_nodeids = _executed_nodeids(shard_1_cli)
+    assert shard_0_nodeids.isdisjoint(shard_1_nodeids)
+    assert shard_0_nodeids | shard_1_nodeids == all_nodeids
+
+
+def test_environment_default_group_marker_is_used(
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Group marker from environment defaults should affect grouping behavior."""
+    _configure_test_environment(pytester)
+    pytester.makepyfile(
+        test_env_marker="""
+import pytest
+
+@pytest.mark.paraflow_group("db")
+def test_grouped_one():
+    assert True
+
+@pytest.mark.paraflow_group("db")
+def test_grouped_two():
+    assert True
+
+def test_regular_one():
+    assert True
+
+def test_regular_two():
+    assert True
+"""
+    )
+
+    grouped_nodeids = {
+        "test_env_marker.py::test_grouped_one",
+        "test_env_marker.py::test_grouped_two",
+    }
+    all_nodeids = {
+        "test_env_marker.py::test_grouped_one",
+        "test_env_marker.py::test_grouped_two",
+        "test_env_marker.py::test_regular_one",
+        "test_env_marker.py::test_regular_two",
+    }
+
+    monkeypatch.setenv("PYTEST_PARAFLOW__NUM_SHARDS", "2")
+    monkeypatch.setenv("PYTEST_PARAFLOW__GROUP_MARKER", '["paraflow_group"]')
+
+    selected_by_shard: dict[int, set[str]] = {}
+    for shard_id in (0, 1):
+        monkeypatch.setenv("PYTEST_PARAFLOW__SHARD_ID", str(shard_id))
+        result = pytester.runpytest_subprocess("-vv", "--color=no")
+        assert result.ret in {pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED}
+        selected_by_shard[shard_id] = _executed_nodeids(result)
+
+    assert grouped_nodeids <= selected_by_shard[0] or grouped_nodeids <= selected_by_shard[1]
+    assert selected_by_shard[0] | selected_by_shard[1] == all_nodeids
+
+
+def test_environment_defaults_enable_dynamic_sharding(
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Target shard size from environment defaults should enable dynamic sharding."""
+    _configure_test_environment(pytester)
+    pytester.makepyfile(
+        test_env_dynamic="""
+def test_a():
+    assert True
+
+def test_b():
+    assert True
+
+def test_c():
+    assert True
+
+def test_d():
+    assert True
+
+def test_e():
+    assert True
+"""
+    )
+
+    all_nodeids = {
+        "test_env_dynamic.py::test_a",
+        "test_env_dynamic.py::test_b",
+        "test_env_dynamic.py::test_c",
+        "test_env_dynamic.py::test_d",
+        "test_env_dynamic.py::test_e",
+    }
+
+    monkeypatch.setenv("PYTEST_PARAFLOW__TARGET_SHARD_SIZE", "2")
+    executed_union: set[str] = set()
+    for shard_id in (0, 1, 2):
+        monkeypatch.setenv("PYTEST_PARAFLOW__SHARD_ID", str(shard_id))
+        result = pytester.runpytest_subprocess("-vv", "--color=no")
+        assert result.ret in {pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED}
+        executed_union.update(_executed_nodeids(result))
+
+    assert executed_union == all_nodeids
+
+    monkeypatch.setenv("PYTEST_PARAFLOW__SHARD_ID", "3")
+    invalid = pytester.runpytest_subprocess("--color=no")
+    assert invalid.ret == pytest.ExitCode.USAGE_ERROR
+    output = invalid.stdout.str() + invalid.stderr.str()
+    assert "--paraflow-shard-id must be in range [0, 2]" in output
+
+
 def test_sharding_options_require_paraflow_shard_id(pytester: pytest.Pytester) -> None:
     """Shard size options must not be accepted without paraflow shard id."""
     _configure_test_environment(pytester)
